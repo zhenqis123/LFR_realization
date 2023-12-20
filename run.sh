@@ -1,1 +1,1 @@
- CUDA_VISIBLE_DEVICES=0,5 python main.py --batch_size=12 --eval
+ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python main.py --batch_size=48

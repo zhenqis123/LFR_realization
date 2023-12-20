@@ -20,12 +20,12 @@ argparser.add_argument('--num_epochs', type=int, default=15)
 argparser.add_argument('--batch_size', type=int, default=10)
 argparser.add_argument('--learning_rate', type=float, default=0.001)
 argparser.add_argument('--latent_path', type=str, default='../latent_synthetic/')
-argparser.add_argument('--rolled_path', type=str, default='/disk1/panzhiyu/fingerprint/NIST14/image')
+argparser.add_argument('--rolled_path', type=str, default='../NIST14/image')
 argparser.add_argument('--ridge_path', type=str, default='../NIST14_veri/enh/')
 argparser.add_argument('--mask_path', type=str, default='../NIST14_veri/seg/')
-argparser.add_argument('--model_path', type=str, default='../latentFinger/log/')
-argparser.add_argument('--info_path', type=str, default='../latentFinger/info.txt')
-argparser.add_argument('--save_path', type=str, default='../latentFinger/enhancedimg/')
+argparser.add_argument('--model_path', type=str, default='./log/')
+argparser.add_argument('--info_path', type=str, default='./info.txt')
+argparser.add_argument('--save_path', type=str, default='./enhancedimg/')
 argparser.add_argument('--eval',action='store_true')
 arg = argparser.parse_args()
 
@@ -49,40 +49,21 @@ def main():
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
     # for i, (latent_img, target, ridge_img, mask)in enumerate((test_loader)):
     #     for j in range(arg.batch_size):
     #         saveimg(latent_img[j], arg.save_path + 'latent_{}.png'.format(i*arg.batch_size+j))
-    # writer = SummaryWriter('../latentFinger/log')
+    writer = SummaryWriter('../latentFinger/log')
     if arg.eval:
         model.load_state_dict(torch.load(arg.model_path + 'model_{}.pth'.format(1)))
         test(model, test_loader, criterion)
     else:
-        model.load_state_dict(torch.load(arg.model_path + 'model_{}.pth'.format(1)))
+        # model.load_state_dict(torch.load(arg.model_path + 'model_{}.pth'.format(1)))
         for epoch in range(arg.num_epochs):
+            train(model, train_loader, criterion, optimizer, epoch, writer)
+            torch.save(model.state_dict(), arg.model_path + 'model_{}.pth'.format(epoch))
+            lr_scheduler.step()
             
-            model.train()
-            dataset_pr = tqdm.tqdm(train_loader)
-            dataset_pr.set_description('epoch: {}'.format(epoch))
-            losses = 0
-            for i, (latent_img, target, ridge_img, mask)in enumerate((dataset_pr)):
-                optimizer.zero_grad()
-                latent_img = latent_img.cuda()
-                target = target.cuda()
-                ridge_img = ridge_img.cuda()
-                mask = mask.cuda()
-                output = model(latent_img)
-
-                output1 = output[:, 0].unsqueeze(1)
-                output2 = output[:, 1].unsqueeze(1)
-                loss1 = F.mse_loss(output1, target, reduction='none') * mask.unsqueeze(0)
-                loss1 = loss1.sum() / mask.sum()
-                loss2 =  criterion(output2, ridge_img)
-                loss = loss1 + loss2
-                loss.backward()
-                optimizer.step()
-                losses += loss.item()
-                dataset_pr.set_description('epoch: {}, loss_target: {}, loss_ridge: {}'.format(epoch, loss1.item()/arg.batch_size, loss2.item()/arg.batch_size))
-                dataset_pr.update(1)
                 # writer.add_scalar('loss_target', loss1.item()/arg.batch_size, epoch*len(dataset_pr)+i)
                 # writer.add_scalar('loss_ridge', loss2.item()/arg.batch_size, epoch*len(dataset_pr)+i)
                 # writer.add_scalar('loss', loss.item()/arg.batch_size, epoch*len(dataset_pr)+i)
@@ -96,10 +77,6 @@ def main():
                 #     saveimg(rolled[j], arg.save_path + 'rolled_{}.png'.format(i*arg.batch_size+j))
                 #     saveimg(ridge[j], arg.save_path + 'ridge_{}.png'.format(i*arg.batch_size+j))
                 # import pdb; pdb.set_trace()
-            print('epoch: {}, loss: {}'.format(epoch, losses/arg.batch_size))
-            dataset_pr.close()
-            # test(model, test_loader, criterion)
-            torch.save(model.state_dict(), arg.model_path + 'model_{}.pth'.format(epoch))
     # writer.close()
 
 
@@ -132,6 +109,7 @@ def train(model, dataset, criterion, optimizer, epoch, writer):
         #     saveimg(rolled[j], arg.save_path + 'rolled_{}.png'.format(i*arg.batch_size+j))
         #     saveimg(ridge[j], arg.save_path + 'ridge_{}.png'.format(i*arg.batch_size+j))
         # import pdb; pdb.set_trace()
+
     print('epoch: {}, loss: {}'.format(epoch, losses/arg.batch_size))
     dataset_pr.close()
 def test(model, dataset, criterion):
@@ -156,11 +134,11 @@ def test(model, dataset, criterion):
 
 
 if __name__ == '__main__':
-    path = os.listdir(arg.save_path)
-    path = os.listdir(arg.model_path)
-    for p in path:
-        os.remove(arg.model_path + p)
-    # main()
+    # path = os.listdir(arg.save_path)
+    # path = os.listdir(arg.model_path)
+    # for p in path:
+    #     os.remove(arg.model_path + p)
+    main()
     
     # path = os.listdir(arg.latent_path)
     # for p in path:
